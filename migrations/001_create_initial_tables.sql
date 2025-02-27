@@ -32,6 +32,7 @@ CREATE TABLE mobile_app_users (
     password_hash VARCHAR(255) NOT NULL,
     wallet_address VARCHAR(42) UNIQUE NOT NULL,
     national_id VARCHAR(14) UNIQUE NOT NULL,
+    email VARCHAR(100) UNIQUE NOT NULL,
     active BOOLEAN DEFAULT true,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
