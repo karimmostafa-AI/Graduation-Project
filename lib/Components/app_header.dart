@@ -3,9 +3,6 @@ import 'package:app/Screens/contracts_screen.dart';
 import 'package:app/Screens/properties_screen.dart';
 import 'package:app/Screens/scan_screen.dart';
 import 'package:flutter/material.dart';
-import 'package:dio/dio.dart';
-import 'package:dio_cookie_manager/dio_cookie_manager.dart';
-import 'package:cookie_jar/cookie_jar.dart';
 import 'package:app/Screens/authentication_screen.dart';
 import 'header_icon.dart';
 import 'color_palette.dart';
@@ -38,7 +35,7 @@ class AppHeader extends StatelessWidget {
       // Close loading dialog
       Navigator.pop(context);
 
-      if (response.statusCode == 200 || response.statusCode == 204) {
+      if (response.statusCode == 200) {
         // Show success message
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(

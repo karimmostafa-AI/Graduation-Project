@@ -3,7 +3,9 @@ import 'package:app/Components/quick_actions.dart';
 import 'package:flutter/material.dart';
 
 class HomeScreen extends StatelessWidget {
-  const HomeScreen({super.key});
+  final String userName; // Add this parameter to store the username
+
+  const HomeScreen({super.key, required this.userName}); // Update constructor
 
   @override
   Widget build(BuildContext context) {
@@ -11,7 +13,7 @@ class HomeScreen extends StatelessWidget {
       backgroundColor: Colors.grey[200],
       appBar: PreferredSize(
         preferredSize: Size.fromHeight(180),
-        child: AppHeader(userName: "أحمد"),
+        child: AppHeader(userName: userName), // Pass the dynamic username
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
@@ -24,7 +26,6 @@ class HomeScreen extends StatelessWidget {
           ],
         ),
       ),
-      // bottomNavigationBar: BottomNavBar(),
     );
   }
 }

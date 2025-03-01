@@ -1,10 +1,8 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:app/utils/constants.dart';
 import 'package:app/utils/validators.dart';
 import 'package:app/Screens/home_screen.dart';
-import 'package:dio/dio.dart';
-import 'package:dio_cookie_manager/dio_cookie_manager.dart';
-import 'package:cookie_jar/cookie_jar.dart';
 import 'package:app/utils/api_client.dart';
 
 class AuthenticationScreen extends StatefulWidget {
@@ -17,7 +15,7 @@ class AuthenticationScreen extends StatefulWidget {
 class _AuthenticationScreenState extends State<AuthenticationScreen> {
   bool isLogin = true;
   final _formKey = GlobalKey<FormState>();
-  bool _isLoading = false; // Track loading state
+  bool _isLoading = false;
 
   // Controllers for all fields
   final _nationalIdController = TextEditingController();
@@ -47,7 +45,7 @@ class _AuthenticationScreenState extends State<AuthenticationScreen> {
   }
 
   Future<void> _submitForm() async {
-    // Validate all fields before submission
+    // Validate fields
     _validateNationalId(_nationalIdController.text);
     _validatePassword(_passwordController.text);
 
@@ -58,7 +56,7 @@ class _AuthenticationScreenState extends State<AuthenticationScreen> {
       _validatePhone(_phoneController.text);
     }
 
-    // Check if there are any errors
+    // Proceed only if no errors
     if (_nationalIdError == null &&
         _passwordError == null &&
         (isLogin ||
@@ -69,149 +67,215 @@ class _AuthenticationScreenState extends State<AuthenticationScreen> {
       print("Form validation passed, attempting submission");
 
       setState(() {
-        _isLoading = true; // Set loading state to true before processing
+        _isLoading = true;
       });
-
-      // Create Dio instance with CookieManager
-      final dio = Dio();
-      final cookieJar = CookieJar();
-      dio.interceptors.add(CookieManager(cookieJar));
-      dio.options.connectTimeout = Duration(seconds: 10); // 10 seconds
 
       try {
         if (isLogin) {
-          // For login, authenticate against the database
+          // Login Mode: use correct endpoint and required fields
           print("Sending API request to login endpoint");
-          try {
-            print(
-                "Attempting login with national ID: ${_nationalIdController.text}");
+          final loginData = {
+            'national_id': _nationalIdController.text,
+            'password': _passwordController.text,
+          };
+          print("Attempting API request with body: $loginData");
 
-            final response = await ApiClient.dio.post(
-              '/auth/login', // Notice the URL is shorter since baseUrl is set
-              data: {
-                'national_id': _nationalIdController.text,
-                'password': _passwordController.text,
-              },
+          final response = await ApiClient.dio.post(
+            '/auth/login',
+            data: loginData,
+          );
+
+          print("Response status code: ${response.statusCode}");
+          print("Response data: ${response.data}");
+
+          if (response.statusCode == 200) {
+            // Extract username from response
+            final responseData = response.data;
+
+            // Extract username from the nested user object
+            final username = responseData['user']['username'];
+
+            if (username == null) {
+              print(
+                  "Warning: Backend did not return a username in the response");
+            }
+
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('تم تسجيل الدخول بنجاح'),
+                backgroundColor: Colors.green,
+              ),
             );
 
-            print("Response status code: ${response.statusCode}");
-            print("Response data: ${response.data}");
-
-            if (response.statusCode == 200) {
-              // Login successful
-              final responseData = response.data;
-
-              // Store user token if provided by API using a method like SharedPreferences
-              // For example:
-              // SharedPreferences prefs = await SharedPreferences.getInstance();
-              // prefs.setString('auth_token', responseData['token']);
-
-              // Show success message
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('تم تسجيل الدخول بنجاح'),
-                  backgroundColor: Colors.green,
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => HomeScreen(
+                  userName:
+                      username ?? "مستخدم", // Fallback if username is null
                 ),
-              );
-
-              // Navigate to home screen after successful login
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (context) => const HomeScreen()),
-              );
+              ),
+            );
+          } else {
+            // Handle login errors
+            final errorData = response.data;
+            String errorMessage;
+            if (response.statusCode == 401) {
+              errorMessage = 'الرقم القومي أو كلمة المرور غير صحيحة';
+            } else if (response.statusCode == 404) {
+              errorMessage = 'لم يتم العثور على المستخدم';
             } else {
-              // Login failed
-              final errorData = response.data;
-              String errorMessage;
-
-              // Handle specific error cases
-              if (response.statusCode == 401) {
-                errorMessage = 'الرقم القومي أو كلمة المرور غير صحيحة';
-              } else if (response.statusCode == 404) {
-                errorMessage = 'لم يتم العثور على المستخدم';
-              } else {
-                errorMessage = errorData['message'] ?? 'فشل تسجيل الدخول';
-              }
-
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(errorMessage),
-                  backgroundColor: Colors.red,
-                ),
-              );
+              errorMessage = errorData['message'] ?? 'فشل تسجيل الدخول';
             }
-          } catch (e) {
-            print("API request failed with error type: ${e.runtimeType}");
-            print("Error details: ${e.toString()}");
-            // Handle network or server errors
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text('خطأ في الاتصال: ${e.toString()}'),
+                content: Text(errorMessage),
                 backgroundColor: Colors.red,
               ),
             );
           }
         } else {
-          // For signup, make API request
+          // Signup Mode: use shared ApiClient.dio instance with proper endpoint
           print("Sending API request to signup endpoint");
-          try {
-            final signupData = {
-              'username': _usernameController.text,
-              'password': _passwordController.text,
-              'phone_number': _phoneController.text,
-              'national_id': _nationalIdController.text,
-              'email': _emailController.text,
-            };
-            print("Attempting API request with body: $signupData");
+          final signupData = {
+            'username': _usernameController.text,
+            'national_id': _nationalIdController.text,
+            'email': _emailController.text,
+            'password': _passwordController.text,
+            'phone_number': _phoneController.text,
+          };
+          print("Attempting API request with body: $signupData");
 
-            final response = await dio.post(
-              'http://192.168.1.8:5000/api/auth/signup',
-              options: Options(headers: {'Content-Type': 'application/json'}),
-              data: signupData,
+          final response = await ApiClient.dio.post(
+            '/auth/signup',
+            data: signupData,
+          );
+
+          print("Response status code: ${response.statusCode}");
+          print("Response data: ${response.data}");
+
+          if (response.statusCode == 200 || response.statusCode == 201) {
+            // Signup successful
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('تم إنشاء الحساب بنجاح'),
+                backgroundColor: Colors.green,
+              ),
             );
 
-            print("Response status code: ${response.statusCode}");
-            print("Response data: ${response.data}");
-
-            if (response.statusCode == 200 || response.statusCode == 201) {
-              // Signup successful
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('تم إنشاء الحساب بنجاح'),
-                  backgroundColor: Colors.green,
-                ),
-              );
-
-              // Navigate to home screen after successful signup
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (context) => const HomeScreen()),
-              );
-            } else {
-              // Signup failed
-              final errorData = response.data;
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(
-                      errorData['message'] ?? 'حدث خطأ أثناء إنشاء الحساب'),
-                  backgroundColor: Colors.red,
-                ),
-              );
-            }
-          } catch (e) {
-            print("API request failed with error type: ${e.runtimeType}");
-            print("Error details: ${e.toString()}");
-            // Handle network or server errors
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                  builder: (context) =>
+                      HomeScreen(userName: _usernameController.text)),
+            );
+          } else {
+            // Handle signup errors
+            final errorData = response.data;
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text('خطأ في الاتصال: ${e.toString()}'),
+                content:
+                    Text(errorData['message'] ?? 'حدث خطأ أثناء إنشاء الحساب'),
                 backgroundColor: Colors.red,
               ),
             );
           }
         }
+      } catch (e) {
+        setState(() {
+          _isLoading = false;
+        });
+
+        String errorMessage = 'خطأ في الاتصال';
+
+        // Handle DioError specifically
+        if (e is DioException) {
+          print("DioError type: ${e.type}");
+          print("DioError message: ${e.message}");
+
+          // Check for specific response data
+          if (e.response != null) {
+            final errorData = e.response?.data;
+            final statusCode = e.response?.statusCode ?? 0;
+            print("Status code: $statusCode");
+            print("Error response: $errorData");
+
+            switch (statusCode) {
+              case 400:
+                errorMessage =
+                    'بيانات غير صالحة: ${errorData['error'] ?? errorData['message'] ?? 'الرجاء التحقق من البيانات المدخلة'}';
+                break;
+              case 401:
+                errorMessage = 'الرقم القومي أو كلمة المرور غير صحيحة';
+                break;
+              case 404:
+                errorMessage = 'لم يتم العثور على المستخدم';
+                break;
+              case 409:
+                // Handle specific conflict errors
+                if (errorData['error']?.contains('Username already exists') ??
+                    false) {
+                  errorMessage = 'اسم المستخدم مستخدم بالفعل';
+                  _setFieldError(_usernameController, _usernameError);
+                } else if (errorData['error']
+                        ?.contains('National ID already registered') ??
+                    false) {
+                  errorMessage = 'الرقم القومي مسجل بالفعل';
+                  _setFieldError(_nationalIdController, _nationalIdError);
+                } else if (errorData['error']
+                        ?.contains('Email already registered') ??
+                    false) {
+                  errorMessage = 'البريد الإلكتروني مسجل بالفعل';
+                  _setFieldError(_emailController, _emailError);
+                } else if (errorData['error']
+                        ?.contains('Phone number already registered') ??
+                    false) {
+                  errorMessage = 'رقم الهاتف مسجل بالفعل';
+                  _setFieldError(_phoneController, _phoneError);
+                } else {
+                  errorMessage =
+                      errorData['error'] ?? 'البيانات المدخلة مستخدمة بالفعل';
+                }
+                break;
+              case 429:
+                errorMessage = 'عدد محاولات كثيرة، الرجاء المحاولة لاحقاً';
+                break;
+              case 500:
+                errorMessage = 'خطأ في الخادم، الرجاء المحاولة مرة أخرى';
+                break;
+              default:
+                errorMessage = errorData?['message'] ??
+                    errorData?['error'] ??
+                    'حدث خطأ أثناء المعالجة';
+            }
+          } else if (e.type == DioExceptionType.connectionTimeout) {
+            errorMessage =
+                'انتهت مهلة الاتصال، الرجاء التحقق من اتصالك بالإنترنت';
+          } else if (e.type == DioExceptionType.receiveTimeout) {
+            errorMessage = 'تأخر الرد من الخادم، الرجاء المحاولة لاحقاً';
+          } else if (e.type == DioExceptionType.connectionError) {
+            errorMessage =
+                'فشل الاتصال بالخادم، الرجاء التحقق من اتصالك بالإنترنت';
+          }
+        } else {
+          errorMessage = 'خطأ: ${e.toString()}';
+        }
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMessage),
+            backgroundColor: Colors.red,
+            duration: Duration(seconds: 5),
+            action: SnackBarAction(
+              label: 'إغلاق',
+              textColor: Colors.white,
+              onPressed: () {
+                ScaffoldMessenger.of(context).hideCurrentSnackBar();
+              },
+            ),
+          ),
+        );
       } finally {
-        // Reset loading state regardless of success or failure
         if (mounted) {
           setState(() {
             _isLoading = false;
@@ -239,8 +303,6 @@ class _AuthenticationScreenState extends State<AuthenticationScreen> {
   void _validatePassword(String value) {
     setState(() {
       _passwordError = Validators.validatePassword(value);
-
-      // If password changes and confirm password was already entered
       if (!isLogin && _confirmPasswordController.text.isNotEmpty) {
         _validateConfirmPassword(_confirmPasswordController.text);
       }
@@ -275,7 +337,7 @@ class _AuthenticationScreenState extends State<AuthenticationScreen> {
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      // Dismiss the keyboard when tapping outside any text field
+      // Dismiss keyboard when tapping outside text fields
       onTap: () => FocusScope.of(context).unfocus(),
       child: Scaffold(
         body: SafeArea(
@@ -286,21 +348,16 @@ class _AuthenticationScreenState extends State<AuthenticationScreen> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    // App Logo
                     Image.asset(
                       'assets/Images/GP_Logo.png',
                       height: 120,
                     ),
                     const SizedBox(height: 20),
-
-                    // App Name with creative styling
                     Text(
                       AppConstants.appNameStyled,
                       style: AppConstants.appNameStyle,
                     ),
                     const SizedBox(height: 40),
-
-                    // Toggle between login and signup
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
@@ -310,15 +367,11 @@ class _AuthenticationScreenState extends State<AuthenticationScreen> {
                       ],
                     ),
                     const SizedBox(height: 30),
-
-                    // Form
                     Form(
                       key: _formKey,
                       child: Column(
                         children: [
-                          // Login Mode Fields
                           if (isLogin) ...[
-                            // National ID field
                             TextFormField(
                               controller: _nationalIdController,
                               keyboardType: TextInputType.number,
@@ -333,8 +386,6 @@ class _AuthenticationScreenState extends State<AuthenticationScreen> {
                               textAlign: TextAlign.right,
                             ),
                             const SizedBox(height: 15),
-
-                            // Password field
                             TextFormField(
                               controller: _passwordController,
                               decoration: AppConstants.textFieldDecoration(
@@ -349,10 +400,7 @@ class _AuthenticationScreenState extends State<AuthenticationScreen> {
                               textAlign: TextAlign.right,
                             ),
                           ],
-
-                          // Signup Mode Fields
                           if (!isLogin) ...[
-                            // 1. Username field
                             TextFormField(
                               controller: _usernameController,
                               decoration: AppConstants.textFieldDecoration(
@@ -366,8 +414,6 @@ class _AuthenticationScreenState extends State<AuthenticationScreen> {
                               textAlign: TextAlign.right,
                             ),
                             const SizedBox(height: 15),
-
-                            // 2. National ID field
                             TextFormField(
                               controller: _nationalIdController,
                               keyboardType: TextInputType.number,
@@ -382,8 +428,6 @@ class _AuthenticationScreenState extends State<AuthenticationScreen> {
                               textAlign: TextAlign.right,
                             ),
                             const SizedBox(height: 15),
-
-                            // 3. Email field
                             TextFormField(
                               controller: _emailController,
                               keyboardType: TextInputType.emailAddress,
@@ -398,8 +442,6 @@ class _AuthenticationScreenState extends State<AuthenticationScreen> {
                               textAlign: TextAlign.right,
                             ),
                             const SizedBox(height: 15),
-
-                            // 4. Password field
                             TextFormField(
                               controller: _passwordController,
                               decoration: AppConstants.textFieldDecoration(
@@ -414,8 +456,6 @@ class _AuthenticationScreenState extends State<AuthenticationScreen> {
                               textAlign: TextAlign.right,
                             ),
                             const SizedBox(height: 15),
-
-                            // 5. Confirm Password field
                             TextFormField(
                               controller: _confirmPasswordController,
                               decoration: AppConstants.textFieldDecoration(
@@ -430,8 +470,6 @@ class _AuthenticationScreenState extends State<AuthenticationScreen> {
                               textAlign: TextAlign.right,
                             ),
                             const SizedBox(height: 15),
-
-                            // 6. Phone field
                             TextFormField(
                               controller: _phoneController,
                               keyboardType: TextInputType.phone,
@@ -446,10 +484,7 @@ class _AuthenticationScreenState extends State<AuthenticationScreen> {
                               textAlign: TextAlign.right,
                             ),
                           ],
-
                           const SizedBox(height: 30),
-
-                          // Submit Button
                           ElevatedButton(
                             onPressed: _isLoading ? null : _submitForm,
                             style: ElevatedButton.styleFrom(
@@ -522,5 +557,20 @@ class _AuthenticationScreenState extends State<AuthenticationScreen> {
         ),
       ),
     );
+  }
+
+  void _setFieldError(TextEditingController controller, String? errorVariable) {
+    // Highlight the field with error
+    setState(() {
+      if (controller == _usernameController) {
+        _usernameError = 'هذا الاسم مستخدم بالفعل';
+      } else if (controller == _nationalIdController) {
+        _nationalIdError = 'الرقم القومي مسجل بالفعل';
+      } else if (controller == _emailController) {
+        _emailError = 'البريد الإلكتروني مسجل بالفعل';
+      } else if (controller == _phoneController) {
+        _phoneError = 'رقم الهاتف مسجل بالفعل';
+      }
+    });
   }
 }
