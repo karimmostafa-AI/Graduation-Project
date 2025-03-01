@@ -44,7 +44,7 @@ router.post('/property-requests',
   authMiddleware, 
   upload.single('ownership_document'),
   propertyRequestController.createRequest
-);
+);//done
 router.get('/property-requests/owned', authMiddleware, propertyRequestController.getOwnedProperties);// get all user's properties
 router.get('/property-requests/requsits_history', authMiddleware, propertyRequestController.getUserRequests);// user all requests
 router.get('/property-requests', authMiddleware, propertyRequestController.getAllRequests);// for the web

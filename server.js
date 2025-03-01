@@ -7,6 +7,8 @@ const path = require('path');
 const pool = require('./db'); // Use the pool from db.js
 const fs = require('fs');
 
+process.env.PGCLIENTENCODING = 'UTF8';
+
 const app = express();
 const port = process.env.PORT || 5000;
 

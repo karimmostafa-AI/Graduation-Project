@@ -5,18 +5,36 @@ const bcrypt = require('bcrypt');
 // Create a new property request
 exports.createRequest = async (req, res) => {
   try {
+    console.log("Received property request:", req.body);
+    console.log("Property type from request:", req.body.property_type);
+    
     const {
       seller_wallet_address,
       buyer_wallet_address,
       full_description,
+      property_type,
+      transaction_date,
       property_price,
+      property_address,
     } = req.body;
+
+    // Debug extracted value
+    console.log("Extracted property_type:", property_type);
 
     // Get the file path from multer
     const ownership_document = req.file ? req.file.path : null;
+    console.log("Ownership document path:", ownership_document);
 
     if (!ownership_document) {
       return res.status(400).json({ error: 'Ownership document is required' });
+    }
+
+    // Validate required fields
+    if (!seller_wallet_address || !buyer_wallet_address || !full_description || !property_price) {
+      return res.status(400).json({ 
+        error: 'Missing required fields',
+        required: ['seller_wallet_address', 'buyer_wallet_address', 'full_description', 'property_price'] 
+      });
     }
 
     // Begin transaction
@@ -26,23 +44,53 @@ exports.createRequest = async (req, res) => {
 
       // Helper function to create temporary user
       const createTempUser = async (walletAddress) => {
-        const shortWallet = walletAddress.substring(2, 6);
+        console.log("Creating temporary user with wallet:", walletAddress);
+        
+        const shortWallet = walletAddress.substring(0, 4);
         const timestamp = Date.now().toString().slice(-6);
+        
+        // Create temporary values
         const tempUsername = `tmp_${shortWallet}_${timestamp}`;
         const tempPassword = await bcrypt.hash(walletAddress, 10);
         const tempNationalId = `TMP${timestamp}${shortWallet}`.slice(0, 14);
+        const tempEmail = `noreply_${shortWallet}_${timestamp}@example.com`;
+        const tempPhone = `+1${timestamp}${shortWallet}`.slice(0, 15);
 
-        await client.query(
-          `INSERT INTO mobile_app_users (
-            username, 
-            password_hash, 
-            wallet_address, 
-            national_id
-          ) VALUES ($1, $2, $3, $4)
-          ON CONFLICT (wallet_address) DO NOTHING
-          RETURNING user_id`,
-          [tempUsername, tempPassword, walletAddress, tempNationalId]
+        // First check if user exists
+        const userExistsResult = await client.query(
+          'SELECT user_id FROM mobile_app_users WHERE wallet_address = $1',
+          [walletAddress]
         );
+
+        if (userExistsResult.rows.length === 0) {
+          console.log("User doesn't exist. Creating new user with values:", {
+            username: tempUsername,
+            wallet: walletAddress,
+            nationalId: tempNationalId,
+            email: tempEmail,
+            phone: tempPhone
+          });
+          
+          // Insert user with all required fields
+          const insertResult = await client.query(
+            `INSERT INTO mobile_app_users (
+              username, 
+              password_hash, 
+              wallet_address, 
+              national_id,
+              email,
+              phone_number
+            ) VALUES ($1, $2, $3, $4, $5, $6)
+            RETURNING user_id`,
+            [tempUsername, tempPassword, walletAddress, tempNationalId, tempEmail, tempPhone]
+          );
+          
+          console.log("User created with ID:", insertResult.rows[0]?.user_id);
+          return insertResult.rows[0]?.user_id;
+        } else {
+          console.log("User already exists with ID:", userExistsResult.rows[0].user_id);
+          return userExistsResult.rows[0].user_id;
+        }
       };
 
       // Check and create seller if needed
@@ -71,22 +119,38 @@ exports.createRequest = async (req, res) => {
           seller_wallet_address,
           buyer_wallet_address,
           full_description,
+          property_type,
+          transaction_date,
           property_price,
+          property_address,
           ownership_document
         )
-        VALUES ($1, $2, $3, $4, $5)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
         RETURNING *;
       `;
       const values = [
         seller_wallet_address,
         buyer_wallet_address,
         full_description,
+        property_type || 'unknown',  // Make sure this isn't null
+        transaction_date || new Date(),
         property_price,
+        property_address || null,
         ownership_document
       ];
       
+      console.log("Executing insert with values:", {
+        ...values,
+        ownership_document: "file_path_here" // Don't log the full path
+      });
+      
+      // Add more debugging to see exactly what's being inserted
+      console.log("Property type being inserted:", property_type || 'unknown');
+      
       const result = await client.query(query, values);
       await client.query('COMMIT');
+      
+      console.log("Property request created successfully");
       
       return res.status(201).json({
         success: true,
@@ -96,6 +160,7 @@ exports.createRequest = async (req, res) => {
 
     } catch (err) {
       await client.query('ROLLBACK');
+      console.error("Transaction error:", err);
       throw err;
     } finally {
       client.release();
@@ -158,16 +223,31 @@ exports.getAllRequests = async (req, res) => {
 // Get property requests related to the logged-in user
 exports.getUserRequests = async (req, res) => {
   try {
-    // Assuming the JWT payload includes the user's phone_number now
-    const userPhone = req.user.phone_number;
+    // Get wallet address from JWT token
+    const userWalletAddress = req.user.wallet_address;
+    
+    if (!userWalletAddress) {
+      console.log("User wallet address not found in token:", req.user);
+      return res.status(400).json({ error: 'User wallet address not found in token' });
+    }
+    
+    console.log("Fetching requests for wallet:", userWalletAddress);
+    
     const query = `
       SELECT *
       FROM property_requests
-      WHERE seller_phone_number = $1 OR buyer_phone_number = $1
+      WHERE seller_wallet_address = $1 OR buyer_wallet_address = $1
       ORDER BY created_at DESC
     `;
-    const result = await pool.query(query, [userPhone]);
-    return res.json({ requests: result.rows });
+    const result = await pool.query(query, [userWalletAddress]);
+    
+    console.log(`Found ${result.rows.length} requests for wallet ${userWalletAddress}`);
+    
+    return res.json({ 
+      success: true,
+      requests: result.rows,
+      count: result.rows.length
+    });
   } catch (error) {
     console.error('Error fetching user property requests:', error);
     return res.status(500).json({ error: 'Internal server error' });
@@ -177,34 +257,40 @@ exports.getUserRequests = async (req, res) => {
 // Get property requests representing properties owned by the logged-in user
 exports.getOwnedProperties = async (req, res) => {
   try {
-    const userPhone = req.user.phone_number;
+    // Get wallet address from JWT token
+    const userWalletAddress = req.user.wallet_address;
     
-    if (!userPhone) {
-      return res.status(400).json({ error: 'User phone number not found in token' });
+    if (!userWalletAddress) {
+      console.log("User wallet address not found in token:", req.user);
+      return res.status(400).json({ error: 'User wallet address not found in token' });
     }
+    
+    console.log("Fetching owned properties for wallet:", userWalletAddress);
 
-    // Modified query to use phone_number
+    // Modified query to use wallet_address
     const query = `
       SELECT 
         pr.*,
         CASE 
-          WHEN seller_phone_number = $1 THEN 'seller'
-          WHEN buyer_phone_number = $1 THEN 'buyer'
+          WHEN seller_wallet_address = $1 THEN 'seller'
+          WHEN buyer_wallet_address = $1 THEN 'buyer'
         END as user_role
       FROM property_requests pr
       WHERE (
-        (buyer_phone_number = $1 AND status = 'approved') OR
-        (seller_phone_number = $1 AND status IN ('pending', 'approved'))
+        (buyer_wallet_address = $1 AND status = 'approved') OR
+        (seller_wallet_address = $1 AND status IN ('pending', 'approved'))
       )
       ORDER BY created_at DESC;
     `;
 
-    const result = await pool.query(query, [userPhone]);
+    const result = await pool.query(query, [userWalletAddress]);
+    
+    console.log(`Found ${result.rows.length} properties for wallet ${userWalletAddress}`);
     
     // Group properties by user's role
     const properties = {
-      owned: result.rows.filter(r => r.buyer_wallet_address === userWallet && r.status === 'approved'),
-      selling: result.rows.filter(r => r.seller_wallet_address === userWallet),
+      owned: result.rows.filter(r => r.buyer_wallet_address === userWalletAddress && r.status === 'approved'),
+      selling: result.rows.filter(r => r.seller_wallet_address === userWalletAddress),
     };
 
     return res.json({
