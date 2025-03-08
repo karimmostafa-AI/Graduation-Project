@@ -4,6 +4,8 @@ import 'package:file_picker/file_picker.dart';
 import 'package:dio/dio.dart';
 import 'dart:io';
 import 'package:app/utils/api_client.dart';
+import 'package:intl/date_symbol_data_local.dart';
+import 'package:app/Screens/scan_screen.dart';
 
 class SellScreen extends StatefulWidget {
   @override
@@ -14,15 +16,67 @@ class _SellScreenState extends State<SellScreen> {
   final _formKey = GlobalKey<FormState>();
   TextEditingController _dateController = TextEditingController();
   TextEditingController _sellerAddressController =
-      TextEditingController(text: "0x6A1D6aC7B8A45E92bAFe4c0dBb0C761C8e845b1E");
+      TextEditingController(); // Remove hardcoded address
   TextEditingController _buyerAddressController = TextEditingController();
   TextEditingController _descriptionController = TextEditingController();
   TextEditingController _priceController = TextEditingController();
   TextEditingController _propertyAddressController = TextEditingController();
-  TextEditingController _propertyTypeController = TextEditingController();
   File? _ownershipDocument;
   String? _documentName;
   bool _isLoading = false;
+  bool _isLoadingWallet = true; // Add loading state for wallet address
+  String? _selectedContractType;
+
+  @override
+  void initState() {
+    super.initState();
+    initializeDateFormatting('ar', null).then((_) {
+      _fetchWalletAddress();
+    });
+  }
+
+  Future<void> _fetchWalletAddress() async {
+    setState(() {
+      _isLoadingWallet = true;
+    });
+
+    try {
+      final response = await ApiClient.dio.get('/auth/wallet');
+
+      if (response.statusCode == 200 && response.data != null) {
+        setState(() {
+          _sellerAddressController.text = response.data['wallet_address'] ?? '';
+          _isLoadingWallet = false;
+        });
+      } else {
+        throw Exception('Failed to load wallet address');
+      }
+    } catch (e) {
+      setState(() {
+        _isLoadingWallet = false;
+      });
+
+      String errorMessage = 'تعذر تحميل عنوان المحفظة';
+      if (e is DioException && e.response?.statusCode == 401) {
+        errorMessage = 'انتهت صلاحية الجلسة. يرجى تسجيل الدخول مرة أخرى';
+
+        // Navigate to login after showing message
+        Future.delayed(Duration(seconds: 2), () {
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (context) => AuthenticationScreen()),
+            (route) => false,
+          );
+        });
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(errorMessage),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
 
   Future<void> _pickDocument() async {
     try {
@@ -68,17 +122,18 @@ class _SellScreenState extends State<SellScreen> {
 
     try {
       // Debug print to verify property type before submission
-      print("Selected property type: ${_propertyTypeController.text}");
+      print("Selected property type: $_selectedContractType");
 
       // Create form data
       FormData formData = FormData.fromMap({
         'seller_wallet_address': _sellerAddressController.text,
         'buyer_wallet_address': _buyerAddressController.text,
         'full_description': _descriptionController.text,
-        'property_type': _propertyTypeController.text,
+        'property_type':
+            _selectedContractType ?? 'شقة', // Using dropdown value now
         'transaction_date': _dateController.text,
         'property_price': double.parse(_priceController.text),
-        if (_propertyTypeController.text != "سيارة")
+        if (_selectedContractType != "سيارة")
           'property_address': _propertyAddressController.text,
         'ownership_document': await MultipartFile.fromFile(
           _ownershipDocument!.path,
@@ -174,12 +229,25 @@ class _SellScreenState extends State<SellScreen> {
     }
   }
 
+  Future<void> _scanQRCode() async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const ScanScreen()),
+    );
+
+    if (result != null && result is String) {
+      setState(() {
+        _buyerAddressController.text = result;
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          "بيع ممتلكات",
+          "عقد بيع",
           textAlign: TextAlign.right,
           style: TextStyle(color: Colors.white),
         ),
@@ -239,7 +307,13 @@ class _SellScreenState extends State<SellScreen> {
                     textAlign: TextAlign.right,
                     decoration: InputDecoration(
                       labelText: "عنوان البلوكشين للبائع",
-                      suffixIcon: Icon(Icons.person),
+                      suffixIcon: _isLoadingWallet
+                          ? SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : Icon(Icons.person),
                       alignLabelWithHint: true,
                     ),
                     validator: (value) {
@@ -255,7 +329,19 @@ class _SellScreenState extends State<SellScreen> {
                     textAlign: TextAlign.right,
                     decoration: InputDecoration(
                       labelText: "عنوان البلوكشين للمشتري",
-                      suffixIcon: Icon(Icons.person_add),
+                      suffixIcon: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            icon: Icon(Icons.qr_code_scanner,
+                                color: Colors.deepPurpleAccent),
+                            onPressed: _scanQRCode,
+                            tooltip: "مسح رمز QR للعنوان",
+                          ),
+                          SizedBox(width: 8),
+                          Icon(Icons.person_add),
+                        ],
+                      ),
                       alignLabelWithHint: true,
                     ),
                     validator: (value) {
@@ -266,24 +352,45 @@ class _SellScreenState extends State<SellScreen> {
                     },
                   ),
                   SizedBox(height: 12),
-                  TextFormField(
-                    controller: _propertyTypeController,
-                    textAlign: TextAlign.right,
+                  DropdownButtonFormField<String>(
+                    value: _selectedContractType,
+                    isExpanded: true,
+                    alignment: AlignmentDirectional.centerEnd,
                     decoration: InputDecoration(
                       labelText: "نوع العقد",
                       suffixIcon: Icon(Icons.article),
                       alignLabelWithHint: true,
-                      hintText: "شقة، فيلا، أرض، محل تجاري، مكتب، سيارة",
                     ),
+                    items: [
+                      "شقة",
+                      "فيلا",
+                      "أرض",
+                      "محل تجاري",
+                      "مكتب",
+                      "سيارة",
+                    ]
+                        .map((type) => DropdownMenuItem(
+                              value: type,
+                              child: Align(
+                                alignment: Alignment.centerRight,
+                                child: Text(type),
+                              ),
+                            ))
+                        .toList(),
+                    onChanged: (value) {
+                      setState(() {
+                        _selectedContractType = value;
+                      });
+                    },
                     validator: (value) {
                       if (value == null || value.isEmpty) {
-                        return 'يرجى إدخال نوع العقد';
+                        return 'يرجى اختيار نوع العقد';
                       }
                       return null;
                     },
                   ),
                   SizedBox(height: 12),
-                  if (_propertyTypeController.text != "سيارة") ...[
+                  if (_selectedContractType != "سيارة") ...[
                     TextFormField(
                       controller: _propertyAddressController,
                       textAlign: TextAlign.right,
@@ -293,7 +400,7 @@ class _SellScreenState extends State<SellScreen> {
                         alignLabelWithHint: true,
                       ),
                       validator: (value) {
-                        if (_propertyTypeController.text != "سيارة" &&
+                        if (_selectedContractType != "سيارة" &&
                             (value == null || value.isEmpty)) {
                           return 'عنوان العقار مطلوب';
                         }

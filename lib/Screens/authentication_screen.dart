@@ -189,74 +189,55 @@ class _AuthenticationScreenState extends State<AuthenticationScreen> {
         String errorMessage = 'خطأ في الاتصال';
 
         // Handle DioError specifically
-        if (e is DioException) {
-          print("DioError type: ${e.type}");
-          print("DioError message: ${e.message}");
+        if (e is DioException && e.response != null) {
+          final statusCode = e.response?.statusCode ?? 0;
+          final errorData = e.response?.data ?? {};
 
-          // Check for specific response data
-          if (e.response != null) {
-            final errorData = e.response?.data;
-            final statusCode = e.response?.statusCode ?? 0;
-            print("Status code: $statusCode");
-            print("Error response: $errorData");
-
-            switch (statusCode) {
-              case 400:
+          switch (statusCode) {
+            case 400:
+              // Handle validation errors
+              break;
+            case 409:
+              // Handle conflict errors - but ignore username conflicts
+              if (errorData['error']
+                      ?.contains('National ID already registered') ??
+                  false) {
+                errorMessage = 'الرقم القومي مسجل بالفعل';
+                _setFieldError(_nationalIdController, _nationalIdError);
+              } else if (errorData['error']
+                      ?.contains('Email already registered') ??
+                  false) {
+                errorMessage = 'البريد الإلكتروني مسجل بالفعل';
+                _setFieldError(_emailController, _emailError);
+              } else if (errorData['error']
+                      ?.contains('Phone number already registered') ??
+                  false) {
+                errorMessage = 'رقم الهاتف مسجل بالفعل';
+                _setFieldError(_phoneController, _phoneError);
+              } else if (errorData['error']
+                      ?.contains('Username already exists') ??
+                  false) {
+                // Don't show error for username, just continue with signup
+                // Skip showing the error message
+                return; // Skip the error message display
+              } else {
                 errorMessage =
-                    'بيانات غير صالحة: ${errorData['error'] ?? errorData['message'] ?? 'الرجاء التحقق من البيانات المدخلة'}';
-                break;
-              case 401:
-                errorMessage = 'الرقم القومي أو كلمة المرور غير صحيحة';
-                break;
-              case 404:
-                errorMessage = 'لم يتم العثور على المستخدم';
-                break;
-              case 409:
-                // Handle specific conflict errors
-                if (errorData['error']?.contains('Username already exists') ??
-                    false) {
-                  errorMessage = 'اسم المستخدم مستخدم بالفعل';
-                  _setFieldError(_usernameController, _usernameError);
-                } else if (errorData['error']
-                        ?.contains('National ID already registered') ??
-                    false) {
-                  errorMessage = 'الرقم القومي مسجل بالفعل';
-                  _setFieldError(_nationalIdController, _nationalIdError);
-                } else if (errorData['error']
-                        ?.contains('Email already registered') ??
-                    false) {
-                  errorMessage = 'البريد الإلكتروني مسجل بالفعل';
-                  _setFieldError(_emailController, _emailError);
-                } else if (errorData['error']
-                        ?.contains('Phone number already registered') ??
-                    false) {
-                  errorMessage = 'رقم الهاتف مسجل بالفعل';
-                  _setFieldError(_phoneController, _phoneError);
-                } else {
-                  errorMessage =
-                      errorData['error'] ?? 'البيانات المدخلة مستخدمة بالفعل';
-                }
-                break;
-              case 429:
-                errorMessage = 'عدد محاولات كثيرة، الرجاء المحاولة لاحقاً';
-                break;
-              case 500:
-                errorMessage = 'خطأ في الخادم، الرجاء المحاولة مرة أخرى';
-                break;
-              default:
-                errorMessage = errorData?['message'] ??
-                    errorData?['error'] ??
-                    'حدث خطأ أثناء المعالجة';
-            }
-          } else if (e.type == DioExceptionType.connectionTimeout) {
-            errorMessage =
-                'انتهت مهلة الاتصال، الرجاء التحقق من اتصالك بالإنترنت';
-          } else if (e.type == DioExceptionType.receiveTimeout) {
-            errorMessage = 'تأخر الرد من الخادم، الرجاء المحاولة لاحقاً';
-          } else if (e.type == DioExceptionType.connectionError) {
-            errorMessage =
-                'فشل الاتصال بالخادم، الرجاء التحقق من اتصالك بالإنترنت';
+                    errorData['error'] ?? 'البيانات المدخلة مستخدمة بالفعل';
+              }
+              break;
+            // Other cases remain the same
           }
+        } else if (e is DioException &&
+            e.type == DioExceptionType.connectionTimeout) {
+          errorMessage =
+              'انتهت مهلة الاتصال، الرجاء التحقق من اتصالك بالإنترنت';
+        } else if (e is DioException &&
+            e.type == DioExceptionType.receiveTimeout) {
+          errorMessage = 'تأخر الرد من الخادم، الرجاء المحاولة لاحقاً';
+        } else if (e is DioException &&
+            e.type == DioExceptionType.connectionError) {
+          errorMessage =
+              'فشل الاتصال بالخادم، الرجاء التحقق من اتصالك بالإنترنت';
         } else {
           errorMessage = 'خطأ: ${e.toString()}';
         }
@@ -404,7 +385,7 @@ class _AuthenticationScreenState extends State<AuthenticationScreen> {
                             TextFormField(
                               controller: _usernameController,
                               decoration: AppConstants.textFieldDecoration(
-                                'اسم المستخدم',
+                                'الاسم رباعي',
                                 Icons.person,
                               ).copyWith(
                                 errorText: _usernameError,

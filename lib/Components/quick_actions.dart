@@ -1,7 +1,7 @@
 import 'package:app/Screens/buy_screen.dart';
-import 'package:app/Screens/contracts_screen.dart';
-import 'package:app/Screens/my_assets_screen.dart';
+import 'package:app/Screens/property_owned.dart';
 import 'package:app/Screens/sell_screen.dart';
+import 'package:app/Screens/transactions_screen.dart';
 import 'package:flutter/material.dart';
 import 'quick_action_item.dart';
 
@@ -36,7 +36,7 @@ class QuickActions extends StatelessWidget {
             QuickActionItem(
                 icon: Icons.receipt,
                 label: "العقود",
-                onTap: () => navigateTo(context, ContractsScreen())),
+                onTap: () => navigateTo(context, TransactionsScreen())),
           ],
         ),
       ],

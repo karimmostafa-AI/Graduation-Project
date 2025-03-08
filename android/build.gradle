@@ -1,3 +1,14 @@
+buildscript {
+    repositories {  // Add this repositories block
+        google()
+        mavenCentral()
+    }
+    
+    dependencies {
+        classpath 'com.android.tools.build:gradle:7.2.0' // Use a version below 7.3.0
+    }
+}
+
 allprojects {
     repositories {
         google()
@@ -16,3 +27,4 @@ subprojects {
 tasks.register("clean", Delete) {
     delete rootProject.buildDir
 }
+

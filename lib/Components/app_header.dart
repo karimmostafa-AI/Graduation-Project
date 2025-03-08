@@ -1,5 +1,7 @@
 import 'package:app/Screens/cars_screen.dart';
 import 'package:app/Screens/contracts_screen.dart';
+import 'package:app/Screens/notifications_screen.dart'; // Add this import
+import 'package:app/Screens/profile_screen.dart';
 import 'package:app/Screens/properties_screen.dart';
 import 'package:app/Screens/scan_screen.dart';
 import 'package:flutter/material.dart';
@@ -8,10 +10,51 @@ import 'header_icon.dart';
 import 'color_palette.dart';
 import 'package:app/utils/api_client.dart';
 
-class AppHeader extends StatelessWidget {
+class AppHeader extends StatefulWidget {
   final String userName;
 
   const AppHeader({Key? key, required this.userName}) : super(key: key);
+
+  @override
+  State<AppHeader> createState() => _AppHeaderState();
+}
+
+class _AppHeaderState extends State<AppHeader> {
+  int _unreadCount = 0;
+  bool _isLoadingNotifications = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchNotificationCount();
+  }
+
+  Future<void> _fetchNotificationCount() async {
+    setState(() {
+      _isLoadingNotifications = true;
+    });
+
+    try {
+      // Update the endpoint to match what's in routes.js
+      final response = await ApiClient.dio.get('/user/notifications/count');
+
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        setState(() {
+          _unreadCount = response.data['unread_count'] ?? 0;
+          _isLoadingNotifications = false;
+        });
+      } else {
+        setState(() {
+          _isLoadingNotifications = false;
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _isLoadingNotifications = false;
+      });
+      print('Error fetching notification count: $e');
+    }
+  }
 
   void navigateTo(BuildContext context, Widget screen) {
     Navigator.push(context, MaterialPageRoute(builder: (context) => screen));
@@ -19,6 +62,7 @@ class AppHeader extends StatelessWidget {
 
   // Updated logout function using Dio with cookie management
   Future<void> _logout(BuildContext context) async {
+    // Existing logout code...
     try {
       // Show loading indicator
       showDialog(
@@ -88,7 +132,7 @@ class AppHeader extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           const SizedBox(height: 10),
-          // Add a row to hold both the welcome text and logout button
+          // Add a row to hold the welcome text and buttons
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -98,13 +142,86 @@ class AppHeader extends StatelessWidget {
                 tooltip: 'تسجيل الخروج',
                 onPressed: () => _logout(context),
               ),
+
+              // Notification button with badge
+              Stack(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.notifications_outlined,
+                        color: Colors.white, size: 28),
+                    tooltip: 'الإشعارات',
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (context) => const NotificationsScreen()),
+                      ).then((_) =>
+                          _fetchNotificationCount()); // Refresh count after returning
+                    },
+                  ),
+                  if (_unreadCount > 0)
+                    Positioned(
+                      right: 8,
+                      top: 8,
+                      child: Container(
+                        padding: const EdgeInsets.all(2),
+                        decoration: BoxDecoration(
+                          color: Colors.red,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        constraints: const BoxConstraints(
+                          minWidth: 16,
+                          minHeight: 16,
+                        ),
+                        child: Text(
+                          _unreadCount > 9 ? '9+' : _unreadCount.toString(),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ),
+                  if (_isLoadingNotifications)
+                    const Positioned(
+                      right: 8,
+                      top: 8,
+                      child: SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor:
+                              AlwaysStoppedAnimation<Color>(Colors.white),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+
               // Welcome text
               Text(
-                "مرحباً، $userName",
+                "مرحباً، ${widget.userName}",
                 style: const TextStyle(
                     fontSize: 22,
                     fontWeight: FontWeight.bold,
                     color: Colors.white),
+              ),
+
+              // Profile button
+              IconButton(
+                icon: Icon(Icons.person, color: Colors.white),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) =>
+                          ProfileScreen(userName: widget.userName),
+                    ),
+                  );
+                },
               ),
             ],
           ),
