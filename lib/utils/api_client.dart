@@ -8,7 +8,8 @@ class ApiClient {
   // Create a single Dio instance with a CookieJar
   static final Dio dio = Dio(
     BaseOptions(
-      baseUrl: 'http://192.168.1.9:5000/api',
+      //             public device IP address and port
+      baseUrl: 'http://Your public ip:5000/api',
       connectTimeout: const Duration(seconds: 10),
       headers: {
         'Content-Type': 'application/json',

@@ -8,13 +8,28 @@ class HomeScreen extends StatelessWidget {
 
   const HomeScreen({super.key, required this.userName});
 
+  // Format name to show only first name and truncate if needed
+  String _formatUserName() {
+    // Extract the first name (split by space and take first part)
+    final firstName = userName.split(' ')[0];
+
+    // Check if first name is longer than 8 characters
+    if (firstName.length > 8) {
+      // Return first 6 characters followed by "..."
+      return '${firstName.substring(0, 6)}...';
+    }
+
+    // Return the full first name if it's not too long
+    return firstName;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.grey[200],
       appBar: PreferredSize(
         preferredSize: Size.fromHeight(180),
-        child: AppHeader(userName: userName),
+        child: AppHeader(userName: _formatUserName()),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),

@@ -10,7 +10,8 @@ class SplashScreen extends StatefulWidget {
   State<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderStateMixin {
+class _SplashScreenState extends State<SplashScreen>
+    with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _opacityAnimation;
   late Animation<double> _scaleAnimation;
@@ -18,30 +19,30 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   @override
   void initState() {
     super.initState();
-    
+
     // Setup animations
     _controller = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 2000),
     );
-    
+
     _opacityAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(
         parent: _controller,
         curve: const Interval(0.0, 0.65, curve: Curves.easeInOut),
       ),
     );
-    
+
     _scaleAnimation = Tween<double>(begin: 0.6, end: 1.0).animate(
       CurvedAnimation(
         parent: _controller,
         curve: const Interval(0.0, 0.65, curve: Curves.easeOutBack),
       ),
     );
-    
+
     // Start the animation
     _controller.forward();
-    
+
     // Navigate to authentication screen after a delay
     Timer(const Duration(seconds: 3), () {
       Navigator.of(context).pushReplacement(
@@ -101,7 +102,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                             ],
                           ),
                           child: Image.asset(
-                            'assets/Images/GP_Logo.png',
+                            'assets/Images/gp_logo.png',
                             fit: BoxFit.contain,
                           ),
                         ),
@@ -129,7 +130,8 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                           width: 60,
                           height: 60,
                           child: CircularProgressIndicator(
-                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                            valueColor:
+                                AlwaysStoppedAnimation<Color>(Colors.white),
                             strokeWidth: 3,
                           ),
                         ),

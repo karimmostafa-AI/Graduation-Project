@@ -15,7 +15,7 @@ class _ChatScreenState extends State<ChatScreen> {
   final List<Map<String, dynamic>> _messages = [];
   bool _isLoading = false;
   final Dio _dio = Dio(BaseOptions(
-    baseUrl: 'http://192.168.1.9:8000',
+    baseUrl: 'http://Your ip:8000',
   ));
 
   @override

@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
 class AppConstants {
-  static const String appName = "Chain وطني";
-  static const String appNameStyled = "Chain وطني";
+  static const String appName = "Tawtheeq ";
+  static const String appNameStyled = "Tawtheeq";
 
   // Colors
   static const Color primaryColor = Color(0xFF2C8572);

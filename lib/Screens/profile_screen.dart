@@ -221,7 +221,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       Column(
                         children: [
                           Text(
-                            widget.userName,
+                            widget.userName
+                                .split(' ')
+                                .first, // Only show the first name
                             style: TextStyle(
                               fontSize: 26,
                               fontWeight: FontWeight.w700,

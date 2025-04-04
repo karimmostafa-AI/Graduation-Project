@@ -330,7 +330,7 @@ class _AuthenticationScreenState extends State<AuthenticationScreen> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Image.asset(
-                      'assets/Images/GP_Logo.png',
+                      'assets/Images/gp_logo.png',
                       height: 120,
                     ),
                     const SizedBox(height: 20),
