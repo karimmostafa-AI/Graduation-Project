@@ -9,7 +9,7 @@ class ApiClient {
   static final Dio dio = Dio(
     BaseOptions(
       //             public device IP address and port
-      baseUrl: 'http://156.195.32.5:5000/api',
+      baseUrl: 'http://192.168.1.9:5000/api',
       connectTimeout: const Duration(seconds: 10),
       headers: {
         'Content-Type': 'application/json',
