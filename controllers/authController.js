@@ -4,15 +4,16 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
 const pool = require('../db'); // our PostgreSQL pool from the previous step
 const { getMissingFields } = require('../utils/validation');
+const { Wallet } = require('ethers'); // Add ethers import at the top of the file
 
 // Ensure you set a JWT secret in your environment variables
 const JWT_SECRET = process.env.JWT_SECRET;
 const JWT_EXPIRES_IN = '1h';  // Adjust as needed
 
-// Signup endpoint for mobile app users (adjust table as necessary)
+// Signup endpoint for mobile app users - modified to allow duplicate usernames
 exports.signup = async (req, res) => {
   try {
-    console.log('Request body:', req.body); // Debug the entire request
+    console.log('Request body:', req.body);
 
     const requiredFields = ['username', 'password', 'national_id', 'email', 'phone_number'];
     const missing = getMissingFields(req.body, requiredFields);
@@ -28,17 +29,24 @@ exports.signup = async (req, res) => {
     const { username, password, national_id, email, phone_number } = req.body;
     console.log('Extracted values:', { username, password: '***', national_id, email, phone_number });
     
-    // Check if user already exists (including phone_number)
+    // Generate a new wallet address automatically
+    const wallet = Wallet.createRandom();
+    const wallet_address = wallet.address;
+    console.log('Generated wallet address:', wallet_address);
+    
+    // MODIFIED: Check if user already exists - removed username uniqueness check
     const checkUser = await pool.query(
-      'SELECT username, national_id, email, phone_number FROM mobile_app_users WHERE username = $1 OR national_id = $2 OR email = $3 OR phone_number = $4',
-      [username, national_id, email, phone_number]
+      'SELECT national_id, email, phone_number FROM mobile_app_users WHERE national_id = $1 OR email = $2 OR phone_number = $3',
+      [national_id, email, phone_number] // Username removed from params
     );
 
     if (checkUser.rows.length > 0) {
       const existing = checkUser.rows[0];
-      if (existing.username === username) {
-        return res.status(409).json({ error: 'Username already exists' });
-      }
+      // REMOVED: Username uniqueness check
+      // if (existing.username === username) {
+      //   return res.status(409).json({ error: 'Username already exists' });
+      // }
+      
       if (existing.national_id === national_id) {
         return res.status(409).json({ error: 'National ID already registered' });
       }
@@ -54,24 +62,24 @@ exports.signup = async (req, res) => {
     const saltRounds = 10;
     const password_hash = await bcrypt.hash(password, saltRounds);
 
-    // Insert with phone_number
+    // Insert with wallet_address and phone_number
     const query = `
-      INSERT INTO mobile_app_users (username, password_hash, national_id, email, phone_number)
-      VALUES ($1, $2, $3, $4, $5)
-      RETURNING user_id, username, national_id, email, phone_number, created_at;
+      INSERT INTO mobile_app_users (username, password_hash, national_id, email, phone_number, wallet_address)
+      VALUES ($1, $2, $3, $4, $5, $6)
+      RETURNING user_id, username, national_id, email, phone_number, wallet_address, created_at;
     `;
-    const values = [username, password_hash, national_id, email, phone_number];
-    console.log('Query values:', { username, password_hash: '***', national_id, email, phone_number });
+    const values = [username, password_hash, national_id, email, phone_number, wallet_address];
+    console.log('Query values:', { username, password_hash: '***', national_id, email, phone_number, wallet_address });
     
     const result = await pool.query(query, values);
     const user = result.rows[0];
 
-    // Include phone_number in JWT token
+    // Include wallet_address in JWT token
     const token = jwt.sign(
       { 
         user_id: user.user_id, 
         role: 'mobile_app_user',
-        phone_number: user.phone_number
+        wallet_address: user.wallet_address
       },
       JWT_SECRET,
       { expiresIn: JWT_EXPIRES_IN }
@@ -79,18 +87,28 @@ exports.signup = async (req, res) => {
     // Set token in HttpOnly cookie
     res.cookie('token', token, { httpOnly: true, secure: process.env.NODE_ENV === 'production' });
 
-    res.status(201).json({ message: 'Signup successful', user });
+    res.status(201).json({ 
+      message: 'Signup successful', 
+      user: {
+        ...user,
+        wallet_address: user.wallet_address
+      }
+    });
   } catch (error) {
     console.error('Signup error:', error);
     if (error.code === '23505') { // PostgreSQL unique violation error code
       if (error.constraint === 'mobile_app_users_national_id_key') {
         return res.status(409).json({ error: 'National ID already registered' });
       }
-      if (error.constraint === 'mobile_app_users_username_key') {
-        return res.status(409).json({ error: 'Username already exists' });
-      }
+      // REMOVED: Username uniqueness constraint check
+      // if (error.constraint === 'mobile_app_users_username_key') {
+      //   return res.status(409).json({ error: 'Username already exists' });
+      // }
       if (error.constraint === 'mobile_app_users_email_key') {
         return res.status(409).json({ error: 'Email already registered' });
+      }
+      if (error.constraint === 'mobile_app_users_wallet_address_key') {
+        return res.status(409).json({ error: 'Wallet address already exists (rare collision)' });
       }
     }
     res.status(500).json({ error: 'Internal server error' });
@@ -218,7 +236,7 @@ exports.login = async (req, res) => {
 
     // Fix the mobile app users query in the login function
     query = `
-      SELECT user_id, username, password_hash, national_id, phone_number 
+      SELECT user_id, username, password_hash, national_id, phone_number, wallet_address 
       FROM mobile_app_users 
       WHERE (national_id = $1 OR username = $1) AND active = true
     `;
@@ -233,7 +251,7 @@ exports.login = async (req, res) => {
           { 
             user_id: user.user_id, 
             role: 'mobile_app_user',
-            phone_number: user.phone_number  // Include this field from the query above
+            wallet_address: user.wallet_address  // Include wallet_address in token
           },
           JWT_SECRET,
           { expiresIn: JWT_EXPIRES_IN }
@@ -250,7 +268,7 @@ exports.login = async (req, res) => {
           user: { 
             user_id: user.user_id, 
             username: user.username, 
-            // wallet_address: user.wallet_address,
+            wallet_address: user.wallet_address,
             role: 'mobile_app_user'
           }
         });
@@ -273,4 +291,31 @@ exports.logout = (req, res) => {
   // Clear the token cookie
   res.clearCookie('token');
   res.json({ message: 'Logged out successfully' });
+};
+
+// Get current user's wallet address
+exports.getWalletAddress = async (req, res) => {
+  try {
+    // The wallet_address should be available in the JWT token
+    const userWalletAddress = req.user.wallet_address;
+    
+    if (!userWalletAddress) {
+      return res.status(404).json({ 
+        success: false,
+        error: 'Wallet address not found for this user' 
+      });
+    }
+    
+    return res.json({
+      success: true,
+      wallet_address: userWalletAddress
+    });
+  } catch (error) {
+    console.error('Error fetching wallet address:', error);
+    return res.status(500).json({ 
+      success: false,
+      error: 'Internal server error',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
 };

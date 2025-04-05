@@ -20,10 +20,17 @@ if (!fs.existsSync(uploadsDir)){
 
 // Configure CORS
 const corsOptions = {
-  origin: ['*'],
+  origin: [
+    'http://localhost:3000',   // Next.js development server
+    'http://127.0.0.1:3000',
+    'http://localhost:5000',   // If frontend is served from Express
+    'http://127.0.0.1:5000',
+    'http://192.168.1.9:3000',
+    'http://192.168.1.9:5000',
+  ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
   preflightContinue: false,
   optionsSuccessStatus: 204
 };
