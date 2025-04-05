@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
-import 'package:app/utils/constants.dart';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key});
@@ -10,12 +9,22 @@ class ChatScreen extends StatefulWidget {
 }
 
 class _ChatScreenState extends State<ChatScreen> {
+  // Chat colors - updated palette
+  final Color userBubbleColor =
+      const Color.fromARGB(255, 23, 27, 97); // Deeper blue-green
+  final Color botBubbleColor =
+      const Color(0xFFF2F8FA); // Light blue-tinted background
+  final Color botIconBackground =
+      const Color(0xFFE4F4F0); // Lighter tint for bot icon
+  final Color sendButtonColor =
+      const Color.fromARGB(255, 23, 27, 97); // Matching user bubble
+
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final List<Map<String, dynamic>> _messages = [];
   bool _isLoading = false;
   final Dio _dio = Dio(BaseOptions(
-    baseUrl: 'http://Your ip:8000',
+    baseUrl: 'http://156.195.32.5:8000',
   ));
 
   @override
@@ -83,8 +92,11 @@ class _ChatScreenState extends State<ChatScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: AppConstants.primaryColor,
-        elevation: 0,
+        backgroundColor: sendButtonColor,
+        leading: BackButton(
+          color: Colors.white,
+        ),
+        elevation: 2,
         title: const Row(
           children: [
             CircleAvatar(
@@ -93,7 +105,7 @@ class _ChatScreenState extends State<ChatScreen> {
               child: Icon(
                 Icons.smart_toy_outlined,
                 size: 18,
-                color: AppConstants.primaryColor,
+                color: Color(0xFF3A7D8C), // Matching new theme
               ),
             ),
             SizedBox(width: 10),
@@ -123,10 +135,10 @@ class _ChatScreenState extends State<ChatScreen> {
               margin: const EdgeInsets.only(top: 20, bottom: 10),
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
               decoration: BoxDecoration(
-                color: AppConstants.primaryColor.withOpacity(0.05),
+                color: sendButtonColor.withOpacity(0.05),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: AppConstants.primaryColor.withOpacity(0.2),
+                  color: sendButtonColor.withOpacity(0.2),
                   width: 1,
                 ),
               ),
@@ -137,7 +149,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 16,
-                      color: AppConstants.primaryColor,
+                      color: sendButtonColor,
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -197,7 +209,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     margin: const EdgeInsets.only(left: 16),
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: AppConstants.primaryColor.withOpacity(0.1),
+                      color: sendButtonColor.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: SizedBox(
@@ -206,7 +218,7 @@ class _ChatScreenState extends State<ChatScreen> {
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
                         valueColor: AlwaysStoppedAnimation<Color>(
-                          AppConstants.primaryColor,
+                          sendButtonColor,
                         ),
                       ),
                     ),
@@ -215,7 +227,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   Text(
                     "جاري التفكير...",
                     style: TextStyle(
-                      color: AppConstants.primaryColor,
+                      color: sendButtonColor,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
@@ -248,13 +260,13 @@ class _ChatScreenState extends State<ChatScreen> {
               width: 32,
               height: 32,
               decoration: BoxDecoration(
-                color: AppConstants.primaryColor.withOpacity(0.1),
+                color: botIconBackground,
                 shape: BoxShape.circle,
               ),
               child: Icon(
                 Icons.smart_toy_outlined,
                 size: 16,
-                color: AppConstants.primaryColor,
+                color: sendButtonColor,
               ),
             ),
             const SizedBox(width: 8),
@@ -266,7 +278,7 @@ class _ChatScreenState extends State<ChatScreen> {
               ),
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: BoxDecoration(
-                color: isUser ? AppConstants.primaryColor : Colors.white,
+                color: isUser ? userBubbleColor : botBubbleColor,
                 borderRadius: BorderRadius.only(
                   topLeft: const Radius.circular(20),
                   topRight: const Radius.circular(20),
@@ -343,9 +355,11 @@ class _ChatScreenState extends State<ChatScreen> {
             offset: const Offset(0, -5),
           ),
         ],
-        borderRadius: const BorderRadius.only(
-          topLeft: Radius.circular(30),
-          topRight: Radius.circular(30),
+        border: Border(
+          top: BorderSide(
+            color: sendButtonColor.withOpacity(0.1),
+            width: 1,
+          ),
         ),
       ),
       child: SafeArea(
@@ -375,7 +389,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     borderSide: BorderSide.none,
                   ),
                   filled: true,
-                  fillColor: Colors.grey[100],
+                  fillColor: botBubbleColor,
                   contentPadding: const EdgeInsets.symmetric(
                     horizontal: 20,
                     vertical: 12,
@@ -390,8 +404,8 @@ class _ChatScreenState extends State<ChatScreen> {
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: [
-                    AppConstants.primaryColor,
-                    AppConstants.primaryColor.withOpacity(0.8),
+                    sendButtonColor,
+                    sendButtonColor.withOpacity(0.8),
                   ],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
@@ -399,7 +413,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 shape: BoxShape.circle,
                 boxShadow: [
                   BoxShadow(
-                    color: AppConstants.primaryColor.withOpacity(0.3),
+                    color: sendButtonColor.withOpacity(0.3),
                     blurRadius: 8,
                     offset: const Offset(0, 3),
                   ),

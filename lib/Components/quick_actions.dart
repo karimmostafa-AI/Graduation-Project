@@ -1,4 +1,3 @@
-import 'package:app/Screens/buy_screen.dart';
 import 'package:app/Screens/property_owned.dart';
 import 'package:app/Screens/sell_screen.dart';
 import 'package:app/Screens/transactions_screen.dart';
@@ -25,10 +24,7 @@ class QuickActions extends StatelessWidget {
                 icon: Icons.sell,
                 label: "بيع الممتلكات",
                 onTap: () => navigateTo(context, SellScreen())),
-            QuickActionItem(
-                icon: Icons.shopping_cart,
-                label: "شراء",
-                onTap: () => navigateTo(context, BuyScreen())),
+          
             QuickActionItem(
                 icon: Icons.account_balance_wallet,
                 label: "ممتلكاتي",

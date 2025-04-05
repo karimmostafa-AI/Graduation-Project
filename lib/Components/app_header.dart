@@ -231,16 +231,12 @@ class _AppHeaderState extends State<AppHeader> {
             children: [
               HeaderIcon(
                   icon: Icons.apartment,
-                  label: "عقارات",
+                  label: "عقاراتي",
                   onTap: () => navigateTo(context, PropertiesScreen())),
               HeaderIcon(
                   icon: Icons.directions_car,
-                  label: "سيارات",
+                  label: "سياراتي",
                   onTap: () => navigateTo(context, CarsScreen())),
-              HeaderIcon(
-                  icon: Icons.assignment,
-                  label: "العقود",
-                  onTap: () => navigateTo(context, ContractsScreen())),
               HeaderIcon(
                   icon: Icons.qr_code,
                   label: "المسح",

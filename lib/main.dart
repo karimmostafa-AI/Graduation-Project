@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:app/utils/constants.dart';
 import 'package:app/screens/splash_screen.dart';
- // Add this import
+
 
 void main() {
   runApp(const MyApp());
